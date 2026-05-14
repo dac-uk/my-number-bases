@@ -250,6 +250,99 @@ export function toPhinary(n: number): ConversionResult {
   };
 }
 
+// --- bijective bases --------------------------------------------------------
+//
+// In a bijective base k the digit set is {1, 2, … , k} (no zero).  Every
+// positive integer has a unique representation, the empty string represents
+// 0, and there is no leading-zero ambiguity.  Bijective base 26 produces the
+// "spreadsheet column" sequence A, B, … Z, AA, AB, … ZZ, AAA …
+
+// Default symbol sets indexed by base.  Symbol at index i is for digit value
+// (i + 1).
+const DEFAULT_BIJECTIVE_SYMBOLS: Record<number, string> = {
+  2:  "12",
+  3:  "123",
+  4:  "1234",
+  5:  "12345",
+  6:  "123456",
+  7:  "1234567",
+  8:  "12345678",
+  9:  "123456789",
+  10: "123456789A",
+  16: "123456789ABCDEFG",
+  26: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+};
+
+export function bijectiveSymbols(k: number): string {
+  if (DEFAULT_BIJECTIVE_SYMBOLS[k]) return DEFAULT_BIJECTIVE_SYMBOLS[k];
+  // fall back to GLYPHS[1..k] (so digit 1 = '1', …, digit 10 = 'A', etc.)
+  let s = "";
+  for (let i = 1; i <= k; i += 1) s += GLYPHS[i % GLYPHS.length];
+  return s;
+}
+
+export function toBijective(
+  n: number,
+  k: number,
+  symbols: string = bijectiveSymbols(k),
+): ConversionResult {
+  if (!Number.isInteger(k) || k < 1) {
+    throw new Error("Bijective base must be a positive integer");
+  }
+  const syms = Array.from(symbols);
+  if (syms.length < k) {
+    throw new Error(`Bijective base ${k} needs ${k} symbols`);
+  }
+  let x = Math.trunc(Math.abs(n));
+  const negative = n < 0;
+  const digits: DigitGlyph[] = [];
+  const steps: ConversionStep[] = [];
+  let power = 0;
+  if (x === 0) {
+    return {
+      digits: ["∅"],
+      steps: [{ remaining: "0", digit: "∅", weight: "—" }],
+      notation: "∅",
+      baseLabel: `bijective base ${k}`,
+    };
+  }
+  while (x > 0) {
+    const r = (x - 1) % k;     // 0 .. k-1
+    const digitVal = r + 1;    // 1 .. k
+    digits.unshift(syms[r]);
+    steps.push({
+      remaining: x.toString(),
+      digit: syms[r],
+      weight: `× ${k}^${power}`,
+    });
+    x = (x - digitVal) / k;
+    power += 1;
+  }
+  return {
+    digits,
+    steps,
+    notation: (negative ? "−" : "") + digits.join(""),
+    baseLabel: `bijective base ${k}`,
+  };
+}
+
+export function parseBijective(
+  text: string,
+  k: number,
+  symbols: string = bijectiveSymbols(k),
+): number {
+  const syms = Array.from(symbols);
+  const trimmed = text.trim();
+  if (!trimmed || trimmed === "∅") return 0;
+  let value = 0;
+  for (const ch of Array.from(trimmed)) {
+    const v = syms.indexOf(ch);
+    if (v < 0) throw new Error(`Unknown bijective digit: ${ch}`);
+    value = value * k + (v + 1);
+  }
+  return value;
+}
+
 // --- registry ---------------------------------------------------------------
 
 export interface BaseSystem {
@@ -257,7 +350,7 @@ export interface BaseSystem {
   label: string;
   description: string;
   convert: (n: number) => ConversionResult;
-  category: "standard" | "negative" | "balanced" | "irrational";
+  category: "standard" | "negative" | "balanced" | "irrational" | "bijective";
 }
 
 export const SYSTEMS: BaseSystem[] = [
@@ -272,6 +365,9 @@ export const SYSTEMS: BaseSystem[] = [
   { id: "bn3", label: "Base −3",              description: "Another negative base.",                    category: "negative", convert: (n) => toNegativeBase(n, -3) },
   { id: "bt3", label: "Balanced ternary",      description: "Digits {−, 0, +}. Donald Knuth's favourite.",category: "balanced", convert: (n) => toBalancedTernary(n) },
   { id: "phi", label: "Phinary (base φ)",     description: "Base golden ratio. Irrational, fractal.",   category: "irrational", convert: (n) => toPhinary(n) },
+  { id: "bij2",  label: "Bijective base 2",   description: "Digits {1, 2}. No zero — every string is a unique number.", category: "bijective", convert: (n) => toBijective(n, 2) },
+  { id: "bij10", label: "Bijective base 10",  description: "Digits 1–9 and A for ten. No zero ever appears.",           category: "bijective", convert: (n) => toBijective(n, 10) },
+  { id: "bij26", label: "Bijective base 26",  description: "Spreadsheet columns: A, B, … Z, AA, AB, …",                 category: "bijective", convert: (n) => toBijective(n, 26) },
 ];
 
 export function systemById(id: string): BaseSystem | undefined {

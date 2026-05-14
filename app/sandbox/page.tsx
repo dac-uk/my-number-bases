@@ -1,21 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { toStandardBase, toNegativeBase, toBalancedTernary, toPhinary } from "@/lib/bases";
+import {
+  bijectiveSymbols,
+  toBalancedTernary,
+  toBijective,
+  toNegativeBase,
+  toPhinary,
+  toStandardBase,
+} from "@/lib/bases";
 import { toBaseMinusOnePlusI } from "@/lib/complex";
+import { PlaceValueEditor } from "@/components/PlaceValueEditor";
 
 interface CustomBaseConfig {
   base: number;        // integer base (can be negative, |b| >= 2)
   symbols: string;     // ordered digit symbols (length must == |base|)
 }
 
+interface PlaceValueConfig {
+  base: number;        // 2..36
+  bijective: boolean;
+  symbols: string;     // length === base
+}
+
 export default function SandboxPage() {
   const [value, setValue] = useState(42);
+
+  // --- custom alphabet (existing) ---
   const [config, setConfig] = useState<CustomBaseConfig>({
     base: 7,
     symbols: "🜁🜂🜃🜄🜔🜕🜖",
   });
-
   const expectedLen = Math.abs(config.base);
   const symbols = useMemo(() => Array.from(config.symbols), [config.symbols]);
   const valid = symbols.length === expectedLen && expectedLen >= 2;
@@ -27,15 +42,35 @@ export default function SandboxPage() {
         config.base > 0
           ? toStandardBase(value, Math.max(2, Math.min(36, config.base)))
           : toNegativeBase(value, config.base);
-      // map glyph indices back to chosen symbols
       const glyphIndex = (g: string) =>
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(g);
-      const rendered = result.digits.map((g) => symbols[glyphIndex(g)] ?? "?").join(" ");
+      const rendered = result.digits
+        .map((g) => symbols[glyphIndex(g)] ?? "?")
+        .join(" ");
       return { rendered, raw: result.notation };
     } catch (e) {
       return { rendered: "—", raw: e instanceof Error ? e.message : "error" };
     }
   }, [value, config.base, symbols, valid]);
+
+  // --- place-value editor ---
+  const [pv, setPv] = useState<PlaceValueConfig>({
+    base: 10,
+    bijective: false,
+    symbols: "0123456789",
+  });
+  const pvSymbols = useMemo(() => Array.from(pv.symbols), [pv.symbols]);
+  const pvExpectedLen = pv.base;
+  const pvValid = pvSymbols.length === pvExpectedLen && pvExpectedLen >= 2;
+
+  // Reset symbols when switching base/bijective if the count doesn't match
+  const setBase = (b: number, bij: boolean = pv.bijective) => {
+    const safeBase = Math.max(2, Math.min(36, Math.trunc(b)));
+    const defaultSyms = bij
+      ? bijectiveSymbols(safeBase)
+      : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(0, safeBase);
+    setPv({ base: safeBase, bijective: bij, symbols: defaultSyms });
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
@@ -45,11 +80,148 @@ export default function SandboxPage() {
           What happens if…
         </h1>
         <p className="mt-2 max-w-2xl text-white/60">
-          Invent your own digit alphabets. Switch to negative bases. Compare
-          arcane systems side by side. Mathematics is not a list of rules —
-          it's a sandbox.
+          Invent your own digit alphabets, switch to bijective or negative
+          bases, key each place value by hand, and compare arcane systems side
+          by side. Mathematics is not a list of rules — it's a sandbox.
         </p>
       </header>
+
+      <section className="mb-10 glass-strong rounded-3xl p-6">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
+              Place-value editor
+            </p>
+            <h2 className="mt-2 font-display text-2xl tracking-tight">
+              Edit each digit by hand
+            </h2>
+            <p className="mt-1 text-sm text-white/60">
+              Increment, decrement, or type a glyph directly into any slot.
+              Watch the decimal value rebuild itself from columns.
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
+              decimal
+            </p>
+            <p className="font-mono text-3xl text-neon-cyan">
+              {value.toLocaleString("en")}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs text-white/55">Base</span>
+              <input
+                type="range"
+                min={2}
+                max={36}
+                value={pv.base}
+                onChange={(e) => setBase(Number(e.target.value), pv.bijective)}
+                className="mt-2 w-full accent-neon-cyan"
+              />
+              <span className="font-mono text-xs text-neon-cyan">
+                {pv.bijective ? "bijective " : ""}base {pv.base}
+              </span>
+            </label>
+
+            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-ink-900/40 p-2 text-sm">
+              <button
+                onClick={() => setBase(pv.base, false)}
+                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+                  !pv.bijective
+                    ? "bg-white/10 text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+              >
+                Standard
+              </button>
+              <button
+                onClick={() => setBase(pv.base, true)}
+                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+                  pv.bijective
+                    ? "bg-white/10 text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+              >
+                Bijective
+              </button>
+            </div>
+
+            <label className="block">
+              <span className="text-xs text-white/55">
+                Symbols (need exactly {pvExpectedLen})
+              </span>
+              <input
+                type="text"
+                value={pv.symbols}
+                onChange={(e) =>
+                  setPv((p) => ({ ...p, symbols: e.target.value }))
+                }
+                className="mt-2 w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-mono tracking-widest"
+              />
+              <span
+                className={`mt-1 block text-xs ${
+                  pvValid ? "text-white/40" : "text-neon-magenta"
+                }`}
+              >
+                {pvSymbols.length} / {pvExpectedLen} symbols ·{" "}
+                {pv.bijective ? "values 1.." + pv.base : "values 0.." + (pv.base - 1)}
+              </span>
+            </label>
+
+            <div className="rounded-xl border border-white/5 bg-ink-900/40 p-3 text-xs text-white/55">
+              <p className="font-medium text-white/75">Try:</p>
+              <button
+                onClick={() => setBase(2, false)}
+                className="mt-1 mr-2 inline-block rounded-full border border-white/10 px-2 py-0.5 hover:border-neon-cyan/60 hover:text-neon-cyan"
+              >
+                binary
+              </button>
+              <button
+                onClick={() => setBase(16, false)}
+                className="mt-1 mr-2 inline-block rounded-full border border-white/10 px-2 py-0.5 hover:border-neon-cyan/60 hover:text-neon-cyan"
+              >
+                hex
+              </button>
+              <button
+                onClick={() => setBase(2, true)}
+                className="mt-1 mr-2 inline-block rounded-full border border-white/10 px-2 py-0.5 hover:border-neon-violet/60 hover:text-neon-violet"
+              >
+                bij base 2
+              </button>
+              <button
+                onClick={() => setBase(10, true)}
+                className="mt-1 mr-2 inline-block rounded-full border border-white/10 px-2 py-0.5 hover:border-neon-violet/60 hover:text-neon-violet"
+              >
+                bij base 10
+              </button>
+              <button
+                onClick={() => setBase(26, true)}
+                className="mt-1 mr-2 inline-block rounded-full border border-white/10 px-2 py-0.5 hover:border-neon-violet/60 hover:text-neon-violet"
+              >
+                bij base 26
+              </button>
+            </div>
+          </div>
+
+          {pvValid ? (
+            <PlaceValueEditor
+              base={pv.base}
+              symbols={pvSymbols}
+              bijective={pv.bijective}
+              value={value}
+              onChange={setValue}
+            />
+          ) : (
+            <div className="grid place-items-center rounded-2xl border border-dashed border-neon-magenta/30 p-8 text-sm text-neon-magenta">
+              Provide exactly {pvExpectedLen} symbols to begin editing.
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <div className="glass-strong rounded-3xl p-6">
@@ -119,6 +291,14 @@ export default function SandboxPage() {
           <Comparison title="Balanced ternary" body={() => toBalancedTernary(value).notation} />
           <Comparison title="Base φ (phinary)" body={() => toPhinary(value).notation} />
           <Comparison
+            title="Bijective base 10"
+            body={() => toBijective(value, 10).notation}
+          />
+          <Comparison
+            title="Bijective base 26 (spreadsheet)"
+            body={() => toBijective(value, 26).notation}
+          />
+          <Comparison
             title="Base −1+i (Gaussian)"
             body={() => toBaseMinusOnePlusI(value, 0).notation}
           />
@@ -126,10 +306,10 @@ export default function SandboxPage() {
       </div>
 
       <p className="mt-12 text-sm text-white/40">
-        Tip: try base 12 with symbols{" "}
-        <span className="font-mono">0123456789↊↋</span> (the "dozenal" transdecimals),
-        or base 16 with{" "}
-        <span className="font-mono">⓪①②③④⑤⑥⑦⑧⑨ⓐⓑⓒⓓⓔⓕ</span>.
+        Tip: try bijective base 26 to see why spreadsheets count{" "}
+        <span className="font-mono">A, B, … Z, AA, AB, …</span> instead of{" "}
+        <span className="font-mono">A, B, … Z, BA, BB, …</span>. With no zero
+        digit, every column label is a unique number.
       </p>
     </div>
   );

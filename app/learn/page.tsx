@@ -64,8 +64,16 @@ const LESSONS: Lesson[] = [
     href: "/explore",
   },
   {
+    slug: "bijective",
+    tag: "08 · bijective bases",
+    title: "The bases without zero",
+    body:
+      "Drop the digit 0 and let digit values run 1..k. Now every string of digits names exactly one positive integer — and the empty string is the only name for zero. Spreadsheet columns are bijective base 26: A, B, … Z, AA, AB.",
+    href: "/sandbox",
+  },
+  {
     slug: "patterns",
-    tag: "08 · pattern",
+    tag: "09 · pattern",
     title: "From arithmetic to art",
     body:
       "Plot (x·y) mod n on a grid. Connect every i to (i·k) mod n on a circle. Numbers, drawn carefully, become structure — and the structure was there all along.",
