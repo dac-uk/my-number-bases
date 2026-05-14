@@ -19,21 +19,22 @@ export default function PatternsPage() {
   const current = KINDS.find((k) => k.id === kind)!;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
-      <header className="mb-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <header className="mb-8 sm:mb-10">
         <span className="chip">Visualisation gallery</span>
-        <h1 className="mt-4 font-display text-4xl tracking-tight">
+        <h1 className="mt-4 font-display text-3xl tracking-tight sm:text-4xl">
           Patterns of bases
         </h1>
         <p className="mt-2 max-w-2xl text-white/60">
           Mathematics looks like nothing until you give it a colour. Try a
-          different base and watch the structure rearrange itself.
+          different base, then hover (or tap) any cell to read the numbers
+          beneath the colour.
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="flex items-center justify-center">
-          <PatternCanvas kind={kind} base={base} param={param} size={560} />
+          <PatternCanvas kind={kind} base={base} param={param} maxSize={560} />
         </div>
 
         <div className="space-y-4">

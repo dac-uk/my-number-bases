@@ -3,45 +3,45 @@ import { HeroArgand } from "@/components/HeroArgand";
 
 export default function HomePage() {
   return (
-    <div className="mx-auto max-w-6xl px-6 pb-24 pt-12 sm:pt-20">
-      <section className="grid items-center gap-10 sm:grid-cols-2 sm:gap-16">
+    <div className="mx-auto max-w-6xl px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-20">
+      <section className="grid items-center gap-8 sm:gap-10 md:grid-cols-2 md:gap-16">
         <div>
           <span className="chip">
             <span className="h-1.5 w-1.5 rounded-full bg-neon-cyan" /> v0.1 — interactive
           </span>
-          <h1 className="mt-6 font-display text-5xl leading-[1.05] tracking-tight sm:text-6xl">
+          <h1 className="mt-5 font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             Numbers are <em className="not-italic text-neon-cyan">stranger</em> than you think.
           </h1>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-white/70">
+          <p className="mt-5 max-w-md text-base leading-relaxed text-white/70">
             An interactive playground for unusual number systems. Convert across
             bases, watch imaginary numbers orbit the complex plane, and discover
             the geometry hiding inside arithmetic.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/explore" className="btn-primary">Explore bases →</Link>
             <Link href="/imaginary" className="btn-ghost">Try imaginary numbers</Link>
             <Link href="/patterns" className="btn-ghost">Visualise patterns</Link>
           </div>
-          <dl className="mt-12 grid grid-cols-3 gap-6 text-sm">
+          <dl className="mt-10 grid grid-cols-3 gap-4 text-sm sm:gap-6">
             <div>
-              <dt className="text-white/40">Bases supported</dt>
-              <dd className="mt-1 font-mono text-xl">2 – 36, −2, φ, i</dd>
+              <dt className="text-white/40">Bases</dt>
+              <dd className="mt-1 font-mono text-base sm:text-xl">2–36, −2, φ, i</dd>
             </div>
             <div>
               <dt className="text-white/40">Style</dt>
-              <dd className="mt-1 font-mono text-xl">live · visual</dd>
+              <dd className="mt-1 font-mono text-base sm:text-xl">live · visual</dd>
             </div>
             <div>
               <dt className="text-white/40">Best for</dt>
-              <dd className="mt-1 font-mono text-xl">curious minds</dd>
+              <dd className="mt-1 font-mono text-base sm:text-xl">curious minds</dd>
             </div>
           </dl>
         </div>
         <HeroArgand />
       </section>
 
-      <section className="mt-28">
-        <h2 className="font-display text-3xl tracking-tight">Five ways in</h2>
+      <section className="mt-20 sm:mt-28">
+        <h2 className="font-display text-2xl tracking-tight sm:text-3xl">Five ways in</h2>
         <p className="mt-2 max-w-xl text-white/60">
           Each room is a different lens onto the same question — what is a
           number, really?

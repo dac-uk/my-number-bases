@@ -43,9 +43,9 @@ export function ImaginaryExplorer() {
   const cycle = ["1", "i", "−1", "−i"];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-4">
-        <ArgandDiagram k={k} height={520} />
+        <ArgandDiagram k={k} aspect={1} />
         <div className="glass rounded-2xl p-5">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
             Powers of i form a cycle of length 4
@@ -173,7 +173,7 @@ function BaseMinusOnePlusICard() {
         </p>
       </div>
       <div className="mt-4">
-        <ArgandDiagram k={0} points={trailPoints} showTrail={false} height={260} />
+        <ArgandDiagram k={0} points={trailPoints} showTrail={false} aspect={1.6} />
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 // canvas + requestAnimationFrame.
 export function HeroArgand({ height = 520 }: { height?: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  void height; // height is now handled responsively via CSS aspect-ratio
 
   useEffect(() => {
     const canvas = ref.current;
@@ -118,10 +119,7 @@ export function HeroArgand({ height = 520 }: { height?: number }) {
   }, []);
 
   return (
-    <div
-      className="relative w-full overflow-hidden rounded-3xl border border-white/5 bg-ink-900/30"
-      style={{ height }}
-    >
+    <div className="relative w-full overflow-hidden rounded-3xl border border-white/5 bg-ink-900/30 aspect-square sm:aspect-[4/5] md:aspect-square">
       <canvas ref={ref} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-ink-950/40 via-transparent to-ink-950/40" />
     </div>

@@ -8,7 +8,10 @@ interface Props {
   k: number;
   // additional points to render (with optional labels)
   points?: { z: Complex; label?: string; tint?: string }[];
-  height?: number;
+  /** Aspect ratio used by the responsive container (width / height). */
+  aspect?: number;
+  /** Tailwind className for the outer container (e.g. min-height utilities). */
+  className?: string;
   showTrail?: boolean;
 }
 
@@ -16,7 +19,8 @@ interface Props {
 export function ArgandDiagram({
   k,
   points = [],
-  height = 480,
+  aspect = 1,
+  className = "",
   showTrail = true,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -182,8 +186,8 @@ export function ArgandDiagram({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-3xl border border-white/5 bg-ink-900/40"
-      style={{ height }}
+      className={`relative w-full overflow-hidden rounded-3xl border border-white/5 bg-ink-900/40 ${className}`}
+      style={{ aspectRatio: aspect }}
     >
       <canvas ref={ref} className="absolute inset-0 h-full w-full" />
     </div>

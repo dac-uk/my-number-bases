@@ -8,11 +8,36 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   background: #05060a;
   color: #e7ebf3;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* avoid awkward auto-scroll-bounce flashes of white on iOS */
+  overscroll-behavior-y: none;
+  /* honour the iPhone notch / home-indicator safe areas */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Remove iOS tap highlight + prevent the 300ms tap delay */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Native form controls should never trigger the iOS auto-zoom */
+input,
+textarea,
+select {
+  font-size: 16px;
 }
 
 body {

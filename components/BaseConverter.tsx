@@ -21,8 +21,8 @@ export function BaseConverter() {
   const isValid = Number.isFinite(numericValue);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-      <div className="glass-strong h-fit rounded-3xl p-6">
+    <div className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+      <div className="glass-strong h-fit rounded-2xl p-5 sm:rounded-3xl sm:p-6 lg:sticky lg:top-20">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
           Input
         </p>

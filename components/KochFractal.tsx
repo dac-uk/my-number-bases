@@ -29,10 +29,10 @@ function iterate(points: Point[]): Point[] {
   return out;
 }
 
-function snowflake(iterations: number): Point[] {
-  const size = 320;
-  const cx = 200;
-  const cy = 220;
+function snowflake(iterations: number, canvasSize: number): Point[] {
+  const size = canvasSize * 0.8;
+  const cx = canvasSize / 2;
+  const cy = canvasSize / 2 + canvasSize * 0.05;
   const a = { x: cx - size / 2, y: cy + size / (2 * Math.sqrt(3)) };
   const b = { x: cx + size / 2, y: cy + size / (2 * Math.sqrt(3)) };
   const c = { x: cx, y: cy - size / Math.sqrt(3) };
@@ -46,12 +46,6 @@ function snowflake(iterations: number): Point[] {
 export function KochFractal() {
   const [depth, setDepth] = useState(3);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const points = useMemo(() => snowflake(depth), [depth]);
-  const perimeter = useMemo(() => {
-    // initial perimeter 3 * 320 = 960 (in pixel units)
-    return 3 * 320 * Math.pow(4 / 3, depth);
-  }, [depth]);
   const segments = useMemo(() => 3 * Math.pow(4, depth), [depth]);
 
   useEffect(() => {
@@ -59,48 +53,56 @@ export function KochFractal() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = 400 * dpr;
-    canvas.height = 400 * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, 400, 400);
 
-    // filled interior (soft glow)
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i += 1) {
-      const p = points[i];
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.closePath();
-    const grad = ctx.createRadialGradient(200, 200, 50, 200, 200, 220);
-    grad.addColorStop(0, "rgba(125, 249, 255, 0.18)");
-    grad.addColorStop(1, "rgba(179, 136, 255, 0.04)");
-    ctx.fillStyle = grad;
-    ctx.fill();
+    const draw = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const css = canvas.clientWidth;
+      canvas.width = css * dpr;
+      canvas.height = css * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, css, css);
 
-    // outline
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i += 1) {
-      const p = points[i];
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.strokeStyle = "#7df9ff";
-    ctx.lineWidth = 1.2;
-    ctx.shadowColor = "#7df9ff";
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }, [points]);
+      const points = snowflake(depth, css);
+
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i += 1) {
+        const p = points[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.closePath();
+      const grad = ctx.createRadialGradient(css / 2, css / 2, css * 0.12, css / 2, css / 2, css * 0.55);
+      grad.addColorStop(0, "rgba(125, 249, 255, 0.18)");
+      grad.addColorStop(1, "rgba(179, 136, 255, 0.04)");
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i += 1) {
+        const p = points[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.strokeStyle = "#7df9ff";
+      ctx.lineWidth = 1.2;
+      ctx.shadowColor = "#7df9ff";
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    };
+
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [depth]);
 
   return (
     <div className="grid gap-6 sm:grid-cols-[1fr_280px]">
       <div className="grid place-items-center">
         <canvas
           ref={canvasRef}
-          style={{ width: 400, height: 400 }}
-          className="rounded-2xl border border-white/8 bg-ink-900/60"
+          className="aspect-square w-full max-w-[400px] rounded-2xl border border-white/8 bg-ink-900/60"
         />
       </div>
 

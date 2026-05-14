@@ -73,10 +73,10 @@ export default function SandboxPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
-      <header className="mb-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <header className="mb-8 sm:mb-10">
         <span className="chip">Sandbox</span>
-        <h1 className="mt-4 font-display text-4xl tracking-tight">
+        <h1 className="mt-4 font-display text-3xl tracking-tight sm:text-4xl">
           What happens if…
         </h1>
         <p className="mt-2 max-w-2xl text-white/60">
@@ -86,16 +86,16 @@ export default function SandboxPage() {
         </p>
       </header>
 
-      <section className="mb-10 glass-strong rounded-3xl p-6">
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <div>
+      <section className="mb-10 glass-strong rounded-2xl p-4 sm:rounded-3xl sm:p-6">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
               Place-value editor
             </p>
-            <h2 className="mt-2 font-display text-2xl tracking-tight">
+            <h2 className="mt-2 font-display text-xl tracking-tight sm:text-2xl">
               Edit each digit by hand
             </h2>
-            <p className="mt-1 text-sm text-white/60">
+            <p className="mt-1 max-w-md text-sm text-white/60">
               Increment, decrement, or type a glyph directly into any slot.
               Watch the decimal value rebuild itself from columns.
             </p>
@@ -104,13 +104,13 @@ export default function SandboxPage() {
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
               decimal
             </p>
-            <p className="font-mono text-3xl text-neon-cyan">
+            <p className="font-mono text-2xl text-neon-cyan sm:text-3xl">
               {value.toLocaleString("en")}
             </p>
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
+        <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
           <div className="space-y-3">
             <label className="block">
               <span className="text-xs text-white/55">Base</span>
@@ -223,7 +223,7 @@ export default function SandboxPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-6 md:grid-cols-2">
         <div className="glass-strong rounded-3xl p-6">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
             Custom digit alphabet
