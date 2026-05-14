@@ -41,12 +41,12 @@ export default function HomePage() {
       </section>
 
       <section className="mt-28">
-        <h2 className="font-display text-3xl tracking-tight">Four ways in</h2>
+        <h2 className="font-display text-3xl tracking-tight">Five ways in</h2>
         <p className="mt-2 max-w-xl text-white/60">
           Each room is a different lens onto the same question — what is a
           number, really?
         </p>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <FeatureCard
             href="/explore"
             tag="Converter"
@@ -62,18 +62,25 @@ export default function HomePage() {
             tint="violet"
           />
           <FeatureCard
+            href="/infinity"
+            tag="Infinity"
+            title="A tour of ∞"
+            body="Hilbert's Hotel, Cantor's diagonal, fractals, and the sums that fit inside a square."
+            tint="magenta"
+          />
+          <FeatureCard
             href="/patterns"
             tag="Gallery"
             title="Pattern visualiser"
             body="Modular art, multiplication circles, binary mosaics — change the base, watch the pattern breathe."
-            tint="magenta"
+            tint="gold"
           />
           <FeatureCard
             href="/sandbox"
             tag="Sandbox"
             title="What happens if…"
-            body="Invent your own bases. Try negative, fractional, or imaginary. Break things on purpose."
-            tint="gold"
+            body="Invent your own bases, edit each digit by hand. Break things on purpose."
+            tint="cyan"
           />
         </div>
       </section>

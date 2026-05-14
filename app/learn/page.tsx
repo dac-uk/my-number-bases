@@ -64,8 +64,16 @@ const LESSONS: Lesson[] = [
     href: "/explore",
   },
   {
+    slug: "infinity",
+    tag: "08 · infinity",
+    title: "Not all infinities are equal",
+    body:
+      "ℵ₀ is the size of the natural numbers. 𝔠 is the size of the real line. Cantor's diagonal argument shows 𝔠 is strictly larger — and there is always a bigger one above it.",
+    href: "/infinity",
+  },
+  {
     slug: "bijective",
-    tag: "08 · bijective bases",
+    tag: "09 · bijective bases",
     title: "The bases without zero",
     body:
       "Drop the digit 0 and let digit values run 1..k. Now every string of digits names exactly one positive integer — and the empty string is the only name for zero. Spreadsheet columns are bijective base 26: A, B, … Z, AA, AB.",
@@ -73,7 +81,7 @@ const LESSONS: Lesson[] = [
   },
   {
     slug: "patterns",
-    tag: "09 · pattern",
+    tag: "10 · pattern",
     title: "From arithmetic to art",
     body:
       "Plot (x·y) mod n on a grid. Connect every i to (i·k) mod n on a circle. Numbers, drawn carefully, become structure — and the structure was there all along.",
