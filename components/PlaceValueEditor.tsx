@@ -195,12 +195,16 @@ export function PlaceValueEditor({
       }
     };
 
+  // Total cell height we lock to so the "+" key and any empty-state matches.
+  const COLUMN_HEIGHT = customWeights ? 224 : 184;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-end gap-2 overflow-x-auto pb-2">
+      <div className="flex items-stretch gap-2 overflow-x-auto pb-2">
         <button
           onClick={addLeading}
-          className="flex h-[110px] w-10 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/50 transition hover:border-neon-cyan/60 hover:text-neon-cyan"
+          className="flex w-10 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 text-xl text-white/50 transition hover:border-neon-cyan/60 hover:text-neon-cyan"
+          style={{ height: COLUMN_HEIGHT }}
           title="Add a high-order digit"
         >
           +
@@ -211,38 +215,45 @@ export function PlaceValueEditor({
           const symbol = bijective ? symbols[d - 1] ?? "?" : symbols[d] ?? "?";
           const isLeading = i === 0;
           const isFocused = focused === i;
+
           return (
             <div
               key={i}
-              className="flex shrink-0 flex-col items-center gap-1"
+              className="flex w-[76px] shrink-0 flex-col items-stretch gap-1.5"
             >
+              {/* Top: weight (custom mode) or power label (standard mode) */}
               {customWeights ? (
                 <label className="flex flex-col items-center gap-0.5">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-neon-violet">
-                    weight
+                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-neon-violet/80">
+                    × weight
                   </span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={w}
                     onChange={(e) =>
                       setWeightAt(i, Number(e.target.value) || 0)
                     }
-                    className="h-7 w-[72px] rounded-md border border-white/10 bg-ink-900/70 px-1 text-center font-mono text-xs text-neon-violet outline-none focus:border-neon-violet/60"
+                    className="h-8 w-full rounded-md border border-neon-violet/30 bg-ink-900/70 px-1 text-center font-mono text-[13px] text-neon-violet outline-none focus:border-neon-violet/70 focus:bg-neon-violet/10"
                   />
                 </label>
               ) : (
-                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
-                  {base}^{power}
+                <span className="block h-8 pt-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+                  {base}<sup>{power}</sup>
                 </span>
               )}
+
+              {/* Increment */}
+              <button
+                onClick={() => adjust(i, +1)}
+                className="grid h-6 w-full place-items-center rounded-md border border-white/10 bg-ink-900/70 text-white/60 transition hover:border-neon-cyan/60 hover:bg-neon-cyan/10 hover:text-neon-cyan"
+                aria-label="increment"
+              >
+                ▲
+              </button>
+
+              {/* Digit cell */}
               <div className="relative">
-                <button
-                  onClick={() => adjust(i, +1)}
-                  className="absolute -top-1 left-1/2 grid h-6 w-8 -translate-x-1/2 -translate-y-full place-items-center rounded-md border border-white/10 bg-ink-900/80 text-white/60 hover:border-neon-cyan/60 hover:text-neon-cyan"
-                  aria-label="increment"
-                >
-                  ▲
-                </button>
                 <motion.button
                   ref={(el) => {
                     cellRefs.current[i] = el;
@@ -258,7 +269,7 @@ export function PlaceValueEditor({
                   }
                   onKeyDown={onCellKey(i)}
                   layout
-                  className={`grid h-[100px] w-[72px] place-items-center rounded-xl border font-mono text-3xl tracking-wider transition ${
+                  className={`grid h-[88px] w-full place-items-center rounded-xl border font-mono text-3xl tracking-wider transition ${
                     isFocused
                       ? "border-neon-cyan/70 bg-neon-cyan/10 text-white shadow-glow"
                       : "border-white/10 bg-ink-900/60 text-white/95 hover:border-white/25"
@@ -273,17 +284,10 @@ export function PlaceValueEditor({
                     {symbol}
                   </motion.span>
                 </motion.button>
-                <button
-                  onClick={() => adjust(i, -1)}
-                  className="absolute -bottom-1 left-1/2 grid h-6 w-8 -translate-x-1/2 translate-y-full place-items-center rounded-md border border-white/10 bg-ink-900/80 text-white/60 hover:border-neon-magenta/60 hover:text-neon-magenta"
-                  aria-label="decrement"
-                >
-                  ▼
-                </button>
                 {isLeading && renderDigits.length > 0 && (
                   <button
                     onClick={removeLeading}
-                    className="absolute -right-2 -top-2 grid h-5 w-5 place-items-center rounded-full border border-white/10 bg-ink-900 text-[10px] text-white/50 hover:border-neon-magenta/60 hover:text-neon-magenta"
+                    className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-white/10 bg-ink-950 text-[10px] text-white/55 hover:border-neon-magenta/60 hover:text-neon-magenta"
                     aria-label="remove leading digit"
                     title="Remove leading digit"
                   >
@@ -291,9 +295,20 @@ export function PlaceValueEditor({
                   </button>
                 )}
               </div>
+
+              {/* Decrement */}
+              <button
+                onClick={() => adjust(i, -1)}
+                className="grid h-6 w-full place-items-center rounded-md border border-white/10 bg-ink-900/70 text-white/60 transition hover:border-neon-magenta/60 hover:bg-neon-magenta/10 hover:text-neon-magenta"
+                aria-label="decrement"
+              >
+                ▼
+              </button>
+
+              {/* Contribution */}
               <span
-                className="mt-6 font-mono text-[10px] text-white/45"
-                title={`${d} × ${w}`}
+                className="block truncate text-center font-mono text-[10px] text-white/55"
+                title={`${d} × ${w} = ${d * w}`}
               >
                 = {(d * w).toLocaleString("en")}
               </span>
@@ -301,7 +316,10 @@ export function PlaceValueEditor({
           );
         })}
         {renderDigits.length === 0 && (
-          <div className="flex h-[110px] items-center px-4 font-mono text-sm text-white/50">
+          <div
+            className="flex shrink-0 items-center rounded-xl border border-dashed border-white/10 px-4 font-mono text-sm text-white/50"
+            style={{ height: COLUMN_HEIGHT }}
+          >
             (empty representation = 0)
           </div>
         )}
@@ -317,7 +335,7 @@ export function PlaceValueEditor({
             className="rounded-full border border-white/10 px-3 py-1 text-white/70 hover:border-neon-cyan/60 hover:text-neon-cyan"
             title={`Reset weights to ${base}^p`}
           >
-            ↺ snap weights to {base}^p
+            ↺ snap weights to {base}<sup>p</sup>
           </button>
         )}
       </div>
