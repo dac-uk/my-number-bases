@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type PatternKind =
   | "modular"
@@ -36,47 +36,46 @@ export function PatternCanvas({ kind, base, param = 7, maxSize = 560 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const spiralMapRef = useRef<Map<string, number>>(new Map());
-  const [size, setSize] = useState(maxSize);
+  // `size` is the canvas's rendered CSS width — updated by the ResizeObserver.
+  const [size, setSize] = useState(0);
   const [hover, setHover] = useState<Hover | null>(null);
 
-  // Responsive sizing — shrink to fit container; cap at maxSize.
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const apply = () => {
-      const available = el.clientWidth;
-      setSize(Math.max(220, Math.min(maxSize, Math.floor(available))));
-    };
-    apply();
-    const ro = new ResizeObserver(apply);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [maxSize]);
-
-  // Drawing.
+  // Single effect: redraw whenever the kind, base, param or rendered size
+  // changes; the ResizeObserver pokes size whenever the canvas reflows.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size, size);
 
-    spiralMapRef.current = new Map();
+    const redraw = () => {
+      const w = canvas.clientWidth;
+      if (w <= 0) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(w * dpr);
+      canvas.height = Math.floor(w * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, w);
 
-    if (kind === "modular") drawModular(ctx, size, base);
-    else if (kind === "multiplication-circle") drawMultCircle(ctx, size, base, param);
-    else if (kind === "ulam") drawUlam(ctx, size, base, spiralMapRef.current);
-    else if (kind === "binary-pixels") drawBinaryPixels(ctx, size, base);
-    else if (kind === "pascal-mod") drawPascal(ctx, size, base);
-  }, [kind, base, param, size]);
+      spiralMapRef.current = new Map();
+      if (kind === "modular") drawModular(ctx, w, base);
+      else if (kind === "multiplication-circle") drawMultCircle(ctx, w, base, param);
+      else if (kind === "ulam") drawUlam(ctx, w, base, spiralMapRef.current);
+      else if (kind === "binary-pixels") drawBinaryPixels(ctx, w, base);
+      else if (kind === "pascal-mod") drawPascal(ctx, w, base);
+
+      setSize(w);
+    };
+
+    redraw();
+    const ro = new ResizeObserver(redraw);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [kind, base, param]);
 
   const onPointer = (e: React.PointerEvent<HTMLDivElement>) => {
     const c = canvasRef.current;
-    if (!c) return;
+    if (!c || size <= 0) return;
     const rect = c.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -100,44 +99,43 @@ export function PatternCanvas({ kind, base, param = 7, maxSize = 560 }: Props) {
     hover && hover.py + 16 + TOOLTIP_H > size ? hover.py - 16 - TOOLTIP_H : (hover?.py ?? 0) + 16;
 
   return (
-    <div ref={containerRef} className="w-full max-w-full">
-      <div
-        className="relative mx-auto touch-none"
-        style={{ width: size, height: size }}
-        onPointerMove={onPointer}
-        onPointerDown={onPointer}
-        onPointerLeave={onLeave}
-        onPointerCancel={onLeave}
-      >
-        <canvas
-          ref={canvasRef}
-          style={{ width: size, height: size }}
-          className="block rounded-2xl border border-white/5 bg-ink-900/60"
-        />
-        {hover && (
-          <>
-            <div
-              className="pointer-events-none absolute rounded-md border border-neon-cyan/80"
-              style={{
-                left: hover.info.cellX,
-                top: hover.info.cellY,
-                width: hover.info.cellW,
-                height: hover.info.cellH,
-                boxShadow: "0 0 0 1px rgba(125,249,255,0.25), 0 0 18px rgba(125,249,255,0.45)",
-              }}
-            />
-            <div
-              className="pointer-events-none absolute z-10 rounded-lg border border-white/10 bg-ink-950/90 px-3 py-2 font-mono text-xs leading-snug text-white/90 backdrop-blur-md"
-              style={{ left: tipLeft, top: tipTop, maxWidth: TOOLTIP_W }}
-            >
-              <span className="block text-neon-cyan">{hover.info.primary}</span>
-              {hover.info.secondary && (
-                <span className="mt-0.5 block text-white/55">{hover.info.secondary}</span>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+    <div
+      ref={containerRef}
+      className="relative mx-auto aspect-square w-full min-w-0 touch-none"
+      style={{ maxWidth: maxSize }}
+      onPointerMove={onPointer}
+      onPointerDown={onPointer}
+      onPointerLeave={onLeave}
+      onPointerCancel={onLeave}
+    >
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 block h-full w-full rounded-2xl border border-white/5 bg-ink-900/60"
+      />
+      {hover && (
+        <>
+          <div
+            className="pointer-events-none absolute rounded-md border border-neon-cyan/80"
+            style={{
+              left: hover.info.cellX,
+              top: hover.info.cellY,
+              width: hover.info.cellW,
+              height: hover.info.cellH,
+              boxShadow:
+                "0 0 0 1px rgba(125,249,255,0.25), 0 0 18px rgba(125,249,255,0.45)",
+            }}
+          />
+          <div
+            className="pointer-events-none absolute z-10 rounded-lg border border-white/10 bg-ink-950/90 px-3 py-2 font-mono text-xs leading-snug text-white/90 backdrop-blur-md"
+            style={{ left: tipLeft, top: tipTop, maxWidth: TOOLTIP_W }}
+          >
+            <span className="block text-neon-cyan">{hover.info.primary}</span>
+            {hover.info.secondary && (
+              <span className="mt-0.5 block text-white/55">{hover.info.secondary}</span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

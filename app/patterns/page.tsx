@@ -32,8 +32,8 @@ export default function PatternsPage() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="flex items-center justify-center">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 items-center justify-center">
           <PatternCanvas kind={kind} base={base} param={param} maxSize={560} />
         </div>
 
