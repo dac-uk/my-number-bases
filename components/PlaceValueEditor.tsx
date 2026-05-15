@@ -7,6 +7,11 @@ interface Props {
   base: number;          // 2..36
   symbols: string[];     // length === base; symbols[i] is the glyph for digit value i (standard) or (i+1) (bijective uses 1..base)
   bijective?: boolean;
+  /**
+   * When true, each column's weight is independently editable instead of being
+   * fixed to base^position. The total decimal value becomes Σ digit_i × weight_i.
+   */
+  customWeights?: boolean;
   value: number;
   onChange: (v: number) => void;
 }
@@ -31,127 +36,205 @@ function decompose(n: number, base: number, bijective: boolean): number[] {
   return digits;
 }
 
-function compose(digits: number[], base: number): number {
+function standardWeights(len: number, base: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < len; i += 1) {
+    out.push(Math.pow(base, len - 1 - i));
+  }
+  return out;
+}
+
+function composeStandard(digits: number[], base: number): number {
   let v = 0;
   for (const d of digits) v = v * base + d;
   return v;
+}
+
+function composeCustom(digits: number[], weights: number[]): number {
+  let s = 0;
+  for (let i = 0; i < digits.length; i += 1) {
+    s += digits[i] * (weights[i] ?? 0);
+  }
+  return s;
 }
 
 export function PlaceValueEditor({
   base,
   symbols,
   bijective = false,
+  customWeights = false,
   value,
   onChange,
 }: Props) {
-  // local digit state to allow editing without losing focus on each keystroke
-  const externalDigits = useMemo(
+  // Derived "standard" state from the external value (used both in standard
+  // mode and as the seed when the user first switches into custom mode).
+  const derivedDigits = useMemo(
     () => decompose(value, base, bijective),
     [value, base, bijective],
   );
-  const [digits, setDigits] = useState<number[]>(externalDigits);
+  const derivedWeights = useMemo(
+    () => standardWeights(derivedDigits.length, base),
+    [derivedDigits.length, base],
+  );
+
+  // Local "custom" state.  Only consulted when customWeights === true.
+  const [customDigits, setCustomDigits] = useState<number[]>(derivedDigits);
+  const [customW, setCustomW] = useState<number[]>(derivedWeights);
+
+  // Snapshot derived state when entering custom mode (and whenever base or
+  // bijective change while inside custom mode).
+  const wasCustom = useRef(false);
+  useEffect(() => {
+    if (customWeights && !wasCustom.current) {
+      setCustomDigits(derivedDigits);
+      setCustomW(derivedWeights);
+    }
+    wasCustom.current = customWeights;
+  }, [customWeights, derivedDigits, derivedWeights]);
+
+  // Also re-seed when base or bijective changes inside custom mode — the digit
+  // range changed, so the existing digits could be out of bounds.
+  useEffect(() => {
+    if (!customWeights) return;
+    setCustomDigits(derivedDigits);
+    setCustomW(derivedWeights);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, bijective]);
+
+  const digits = customWeights ? customDigits : derivedDigits;
+  const weights = customWeights ? customW : derivedWeights;
+
   const [focused, setFocused] = useState<number | null>(null);
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([]);
-
-  // sync when external value changes (e.g. user typed elsewhere)
-  useEffect(() => {
-    setDigits(externalDigits);
-  }, [externalDigits]);
 
   const minDigit = bijective ? 1 : 0;
   const maxDigit = bijective ? base : base - 1;
 
-  const commit = (next: number[]) => {
-    setDigits(next);
-    onChange(compose(next, base));
+  const commitDigits = (nextDigits: number[], nextWeights: number[] = weights) => {
+    if (customWeights) {
+      setCustomDigits(nextDigits);
+      setCustomW(nextWeights);
+      onChange(composeCustom(nextDigits, nextWeights));
+    } else {
+      onChange(composeStandard(nextDigits, base));
+    }
+  };
+
+  const commitWeights = (nextWeights: number[]) => {
+    setCustomW(nextWeights);
+    onChange(composeCustom(digits, nextWeights));
   };
 
   const adjust = (i: number, delta: number) => {
     const next = [...digits];
     const target = (next[i] ?? minDigit) + delta;
-    if (target < minDigit) {
-      // wrap to top of range
-      next[i] = maxDigit;
-    } else if (target > maxDigit) {
-      next[i] = minDigit;
-    } else {
-      next[i] = target;
-    }
-    commit(next);
+    if (target < minDigit) next[i] = maxDigit;
+    else if (target > maxDigit) next[i] = minDigit;
+    else next[i] = target;
+    commitDigits(next);
   };
 
   const setDigitAt = (i: number, v: number) => {
     const clamped = Math.max(minDigit, Math.min(maxDigit, v));
     const next = [...digits];
     next[i] = clamped;
-    commit(next);
+    commitDigits(next);
+  };
+
+  const setWeightAt = (i: number, w: number) => {
+    const next = [...weights];
+    next[i] = w;
+    commitWeights(next);
   };
 
   const addLeading = () => {
-    commit([minDigit === 0 ? 1 : minDigit, ...digits]); // start with smallest meaningful value
+    const newDigits = [minDigit === 0 ? 1 : minDigit, ...digits];
+    const leadingWeight = weights[0] ?? 1;
+    const newWeights = [leadingWeight * base, ...weights];
+    commitDigits(newDigits, newWeights);
   };
 
   const removeLeading = () => {
     if (digits.length <= 1) {
-      commit(bijective ? [] : [0]);
+      commitDigits(bijective ? [] : [0], bijective ? [] : [1]);
       return;
     }
-    commit(digits.slice(1));
+    commitDigits(digits.slice(1), weights.slice(1));
   };
 
-  // empty bijective representation is allowed (== 0). Show a placeholder cell.
+  const snapWeightsToPowers = () => {
+    commitWeights(standardWeights(digits.length, base));
+  };
+
   const renderDigits = digits.length === 0 ? [] : digits;
 
-  const onCellKey = (i: number) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      adjust(i, +1);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      adjust(i, -1);
-    } else if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      const t = cellRefs.current[i - 1];
-      t?.focus();
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      const t = cellRefs.current[i + 1];
-      t?.focus();
-    } else if (e.key.length === 1) {
-      // type a glyph
-      const idx = symbols.indexOf(e.key.toUpperCase());
-      if (idx >= 0) {
+  const onCellKey =
+    (i: number) => (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key === "ArrowUp") {
         e.preventDefault();
-        const target = bijective ? idx + 1 : idx;
-        setDigitAt(i, target);
+        adjust(i, +1);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        adjust(i, -1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        cellRefs.current[i - 1]?.focus();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        cellRefs.current[i + 1]?.focus();
+      } else if (e.key.length === 1) {
+        const idx = symbols.indexOf(e.key.toUpperCase());
+        if (idx >= 0) {
+          e.preventDefault();
+          const target = bijective ? idx + 1 : idx;
+          setDigitAt(i, target);
+        }
+      } else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        setDigitAt(i, minDigit);
       }
-    } else if (e.key === "Backspace" || e.key === "Delete") {
-      e.preventDefault();
-      setDigitAt(i, minDigit);
-    }
-  };
+    };
 
   return (
     <div className="space-y-4">
       <div className="flex items-end gap-2 overflow-x-auto pb-2">
         <button
           onClick={addLeading}
-          className="flex h-[100px] w-10 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/50 transition hover:border-neon-cyan/60 hover:text-neon-cyan"
+          className="flex h-[110px] w-10 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/50 transition hover:border-neon-cyan/60 hover:text-neon-cyan"
           title="Add a high-order digit"
         >
           +
         </button>
         {renderDigits.map((d, i) => {
+          const w = weights[i] ?? 0;
           const power = renderDigits.length - 1 - i;
-          const weight = Math.pow(base, power);
           const symbol = bijective ? symbols[d - 1] ?? "?" : symbols[d] ?? "?";
           const isLeading = i === 0;
           const isFocused = focused === i;
           return (
-            <div key={i} className="flex flex-col items-center gap-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
-                {base}^{power}
-              </span>
+            <div
+              key={i}
+              className="flex shrink-0 flex-col items-center gap-1"
+            >
+              {customWeights ? (
+                <label className="flex flex-col items-center gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-neon-violet">
+                    weight
+                  </span>
+                  <input
+                    type="number"
+                    value={w}
+                    onChange={(e) =>
+                      setWeightAt(i, Number(e.target.value) || 0)
+                    }
+                    className="h-7 w-[72px] rounded-md border border-white/10 bg-ink-900/70 px-1 text-center font-mono text-xs text-neon-violet outline-none focus:border-neon-violet/60"
+                  />
+                </label>
+              ) : (
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+                  {base}^{power}
+                </span>
+              )}
               <div className="relative">
                 <button
                   onClick={() => adjust(i, +1)}
@@ -170,10 +253,12 @@ export function PlaceValueEditor({
                     adjust(i, -1);
                   }}
                   onFocus={() => setFocused(i)}
-                  onBlur={() => setFocused((f) => (f === i ? null : f))}
+                  onBlur={() =>
+                    setFocused((f) => (f === i ? null : f))
+                  }
                   onKeyDown={onCellKey(i)}
                   layout
-                  className={`grid h-[100px] w-[64px] place-items-center rounded-xl border font-mono text-3xl tracking-wider transition ${
+                  className={`grid h-[100px] w-[72px] place-items-center rounded-xl border font-mono text-3xl tracking-wider transition ${
                     isFocused
                       ? "border-neon-cyan/70 bg-neon-cyan/10 text-white shadow-glow"
                       : "border-white/10 bg-ink-900/60 text-white/95 hover:border-white/25"
@@ -206,23 +291,35 @@ export function PlaceValueEditor({
                   </button>
                 )}
               </div>
-              <span className="mt-6 font-mono text-[10px] text-white/45">
-                = {(d * weight).toLocaleString("en")}
+              <span
+                className="mt-6 font-mono text-[10px] text-white/45"
+                title={`${d} × ${w}`}
+              >
+                = {(d * w).toLocaleString("en")}
               </span>
             </div>
           );
         })}
         {renderDigits.length === 0 && (
-          <div className="flex h-[100px] items-center px-4 font-mono text-sm text-white/50">
+          <div className="flex h-[110px] items-center px-4 font-mono text-sm text-white/50">
             (empty representation = 0)
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <span className="font-mono uppercase tracking-[0.2em] text-white/40">
           ↑/↓ adjust · ←/→ move · type a digit · right-click decrement
         </span>
+        {customWeights && (
+          <button
+            onClick={snapWeightsToPowers}
+            className="rounded-full border border-white/10 px-3 py-1 text-white/70 hover:border-neon-cyan/60 hover:text-neon-cyan"
+            title={`Reset weights to ${base}^p`}
+          >
+            ↺ snap weights to {base}^p
+          </button>
+        )}
       </div>
     </div>
   );

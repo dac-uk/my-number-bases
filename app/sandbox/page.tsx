@@ -20,6 +20,7 @@ interface CustomBaseConfig {
 interface PlaceValueConfig {
   base: number;        // 2..36
   bijective: boolean;
+  customWeights: boolean;
   symbols: string;     // length === base
 }
 
@@ -57,6 +58,7 @@ export default function SandboxPage() {
   const [pv, setPv] = useState<PlaceValueConfig>({
     base: 10,
     bijective: false,
+    customWeights: false,
     symbols: "0123456789",
   });
   const pvSymbols = useMemo(() => Array.from(pv.symbols), [pv.symbols]);
@@ -69,7 +71,16 @@ export default function SandboxPage() {
     const defaultSyms = bij
       ? bijectiveSymbols(safeBase)
       : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(0, safeBase);
-    setPv({ base: safeBase, bijective: bij, symbols: defaultSyms });
+    setPv((p) => ({
+      base: safeBase,
+      bijective: bij,
+      customWeights: p.customWeights,
+      symbols: defaultSyms,
+    }));
+  };
+
+  const setCustomWeights = (cw: boolean) => {
+    setPv((p) => ({ ...p, customWeights: cw }));
   };
 
   return (
@@ -97,7 +108,8 @@ export default function SandboxPage() {
             </h2>
             <p className="mt-1 max-w-md text-sm text-white/60">
               Increment, decrement, or type a glyph directly into any slot.
-              Watch the decimal value rebuild itself from columns.
+              Flip to <span className="text-neon-violet">Custom weights</span>{" "}
+              to set each column's multiplier yourself.
             </p>
           </div>
           <div className="text-right">
@@ -149,6 +161,47 @@ export default function SandboxPage() {
                 Bijective
               </button>
             </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-ink-900/40 p-2 text-sm">
+              <button
+                onClick={() => setCustomWeights(false)}
+                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+                  !pv.customWeights
+                    ? "bg-white/10 text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+                title={`Each column's weight = ${pv.base}^position`}
+              >
+                {pv.base}^p weights
+              </button>
+              <button
+                onClick={() => setCustomWeights(true)}
+                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+                  pv.customWeights
+                    ? "bg-neon-violet/15 text-neon-violet"
+                    : "text-white/55 hover:text-white"
+                }`}
+                title="Edit each column's weight independently"
+              >
+                Custom weights
+              </button>
+            </div>
+
+            {pv.customWeights && (
+              <div className="rounded-xl border border-neon-violet/30 bg-neon-violet/5 p-3 text-xs text-white/65">
+                <p className="font-mono uppercase tracking-[0.18em] text-neon-violet">
+                  free-form positional system
+                </p>
+                <p className="mt-1.5 text-white/70">
+                  Each column's weight is now an editable number. The decimal
+                  value becomes{" "}
+                  <span className="font-mono">Σ d<sub>i</sub> · w<sub>i</sub></span>.
+                </p>
+                <p className="mt-1.5 font-mono text-[11px] text-white/55">
+                  e.g. 1·210 + 2·9 + 3·2 = 234
+                </p>
+              </div>
+            )}
 
             <label className="block">
               <span className="text-xs text-white/55">
@@ -212,6 +265,7 @@ export default function SandboxPage() {
               base={pv.base}
               symbols={pvSymbols}
               bijective={pv.bijective}
+              customWeights={pv.customWeights}
               value={value}
               onChange={setValue}
             />

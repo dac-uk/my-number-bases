@@ -9,3 +9,7 @@ out
 .vercel
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# reference photos / scratchpad (kept locally, not deployed)
+*.HEIC
+*.heic
