@@ -10,7 +10,7 @@ import {
   toStandardBase,
 } from "@/lib/bases";
 import { toBaseMinusOnePlusI } from "@/lib/complex";
-import { PlaceValueEditor } from "@/components/PlaceValueEditor";
+import { PlaceValueEditor, type WeightMode } from "@/components/PlaceValueEditor";
 
 interface CustomBaseConfig {
   base: number;        // integer base (can be negative, |b| >= 2)
@@ -20,8 +20,10 @@ interface CustomBaseConfig {
 interface PlaceValueConfig {
   base: number;        // 2..36
   bijective: boolean;
-  customWeights: boolean;
+  weightMode: WeightMode;
   symbols: string;     // length === base
+  anchorPos: number;
+  anchorValue: number;
 }
 
 export default function SandboxPage() {
@@ -58,8 +60,10 @@ export default function SandboxPage() {
   const [pv, setPv] = useState<PlaceValueConfig>({
     base: 10,
     bijective: false,
-    customWeights: false,
+    weightMode: "powers",
     symbols: "0123456789",
+    anchorPos: 0,
+    anchorValue: 1,
   });
   const pvSymbols = useMemo(() => Array.from(pv.symbols), [pv.symbols]);
   const pvExpectedLen = pv.base;
@@ -71,16 +75,37 @@ export default function SandboxPage() {
     const defaultSyms = bij
       ? bijectiveSymbols(safeBase)
       : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".slice(0, safeBase);
+    setPv((p) => ({ ...p, base: safeBase, bijective: bij, symbols: defaultSyms }));
+  };
+
+  const setWeightMode = (mode: WeightMode) => {
+    setPv((p) => {
+      // when entering anchored mode for the first time, seed the anchor with
+      // a sensible value: the standard weight at that position so the system
+      // initially behaves like powers, ready to be customised.
+      if (mode === "anchored" && p.weightMode !== "anchored") {
+        return {
+          ...p,
+          weightMode: mode,
+          anchorValue: Math.pow(p.base, p.anchorPos),
+        };
+      }
+      return { ...p, weightMode: mode };
+    });
+  };
+
+  const setAnchorPos = (pos: number) => {
     setPv((p) => ({
-      base: safeBase,
-      bijective: bij,
-      customWeights: p.customWeights,
-      symbols: defaultSyms,
+      ...p,
+      anchorPos: pos,
+      // when the user picks a new anchor, re-seed its value to the standard
+      // weight at the new position so the system initially looks unchanged.
+      anchorValue: Math.pow(p.base, pos),
     }));
   };
 
-  const setCustomWeights = (cw: boolean) => {
-    setPv((p) => ({ ...p, customWeights: cw }));
+  const setAnchorValue = (v: number) => {
+    setPv((p) => ({ ...p, anchorValue: v }));
   };
 
   return (
@@ -108,8 +133,10 @@ export default function SandboxPage() {
             </h2>
             <p className="mt-1 max-w-md text-sm text-white/60">
               Increment, decrement, or type a glyph directly into any slot.
-              Flip to <span className="text-neon-violet">Custom weights</span>{" "}
-              to set each column's multiplier yourself.
+              Switch to <span className="text-neon-gold">★ Anchor</span> to set
+              one column's weight and watch the rest derive, or{" "}
+              <span className="text-neon-violet">Custom</span> to edit every
+              column independently.
             </p>
           </div>
           <div className="text-right">
@@ -162,32 +189,43 @@ export default function SandboxPage() {
               </button>
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-ink-900/40 p-2 text-sm">
+            <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/8 bg-ink-900/40 p-1 text-[12px]">
               <button
-                onClick={() => setCustomWeights(false)}
-                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-                  !pv.customWeights
+                onClick={() => setWeightMode("powers")}
+                className={`rounded-lg px-2 py-1.5 transition ${
+                  pv.weightMode === "powers"
                     ? "bg-white/10 text-white"
                     : "text-white/55 hover:text-white"
                 }`}
                 title={`Each column's weight = ${pv.base}^position`}
               >
-                {pv.base}^p weights
+                {pv.base}<sup>p</sup>
               </button>
               <button
-                onClick={() => setCustomWeights(true)}
-                className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-                  pv.customWeights
+                onClick={() => setWeightMode("anchored")}
+                className={`rounded-lg px-2 py-1.5 transition ${
+                  pv.weightMode === "anchored"
+                    ? "bg-neon-gold/15 text-neon-gold"
+                    : "text-white/55 hover:text-white"
+                }`}
+                title="Set one column's weight; derive the rest"
+              >
+                ★ Anchor
+              </button>
+              <button
+                onClick={() => setWeightMode("custom")}
+                className={`rounded-lg px-2 py-1.5 transition ${
+                  pv.weightMode === "custom"
                     ? "bg-neon-violet/15 text-neon-violet"
                     : "text-white/55 hover:text-white"
                 }`}
                 title="Edit each column's weight independently"
               >
-                Custom weights
+                Custom
               </button>
             </div>
 
-            {pv.customWeights && (
+            {pv.weightMode === "custom" && (
               <div className="rounded-xl border border-neon-violet/30 bg-neon-violet/5 p-3 text-xs text-white/65">
                 <p className="font-mono uppercase tracking-[0.18em] text-neon-violet">
                   free-form positional system
@@ -199,6 +237,27 @@ export default function SandboxPage() {
                 </p>
                 <p className="mt-1.5 font-mono text-[11px] text-white/55">
                   e.g. 1·210 + 2·9 + 3·2 = 234
+                </p>
+              </div>
+            )}
+
+            {pv.weightMode === "anchored" && (
+              <div className="rounded-xl border border-neon-gold/30 bg-neon-gold/5 p-3 text-xs text-white/70">
+                <p className="font-mono uppercase tracking-[0.18em] text-neon-gold">
+                  anchor a column · auto-derive the rest
+                </p>
+                <p className="mt-1.5 text-white/75">
+                  Tap <span className="text-white">set anchor</span> on any
+                  column, then type its weight (call it <em>C</em>). Columns
+                  below stay as <span className="font-mono">{pv.base}<sup>p</sup></span>.
+                  Columns above alternate
+                  {" "}× <span className="font-mono">{pv.base}</span>,
+                  {" "}× <span className="font-mono">C / {pv.base}<sup>K−1</sup></span>,
+                  going up.
+                </p>
+                <p className="mt-1.5 font-mono text-[11px] text-white/55">
+                  e.g. base 2, anchor at pos 2 with C=3: 1, 2,{" "}
+                  <span className="text-neon-gold">3</span>, 6, 9, 18, 27, …
                 </p>
               </div>
             )}
@@ -265,7 +324,11 @@ export default function SandboxPage() {
               base={pv.base}
               symbols={pvSymbols}
               bijective={pv.bijective}
-              customWeights={pv.customWeights}
+              weightMode={pv.weightMode}
+              anchorPos={pv.anchorPos}
+              anchorValue={pv.anchorValue}
+              onAnchorPosChange={setAnchorPos}
+              onAnchorValueChange={setAnchorValue}
               value={value}
               onChange={setValue}
             />

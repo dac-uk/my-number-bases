@@ -3,15 +3,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
+export type WeightMode = "powers" | "custom" | "anchored";
+
 interface Props {
   base: number;          // 2..36
   symbols: string[];     // length === base; symbols[i] is the glyph for digit value i (standard) or (i+1) (bijective uses 1..base)
   bijective?: boolean;
   /**
-   * When true, each column's weight is independently editable instead of being
-   * fixed to base^position. The total decimal value becomes Σ digit_i × weight_i.
+   * "powers"   — each column's weight = base^position (standard positional)
+   * "custom"   — every column's weight is independently editable
+   * "anchored" — one column ("anchor") is editable; positions BELOW are powers
+   *              of base; positions ABOVE follow an alternating
+   *              "× base, × C/base^(K-1), × base, × C/base^(K-1), …" pattern.
    */
-  customWeights?: boolean;
+  weightMode: WeightMode;
+  /** Anchored mode: which position (from the right, 0 = ones) is the anchor. */
+  anchorPos?: number;
+  /** Anchored mode: the user-set weight at the anchor column. */
+  anchorValue?: number;
+  /** Anchored mode: change the anchor position (e.g. by clicking a column). */
+  onAnchorPosChange?: (pos: number) => void;
+  /** Anchored mode: change the anchor weight value. */
+  onAnchorValueChange?: (value: number) => void;
   value: number;
   onChange: (v: number) => void;
 }
@@ -44,13 +57,54 @@ function standardWeights(len: number, base: number): number[] {
   return out;
 }
 
+// Compute the weight at a single position under "anchored" mode.
+//
+//   For p <  K : weight = base^p   (standard powers below the anchor)
+//   For p == K : weight = C        (the user-set value)
+//   For p >  K : alternating multipliers, starting with × base:
+//                  pos K+1 = C · base
+//                  pos K+2 = C · base · R      where R = C / base^(K-1)
+//                  pos K+3 = C · base² · R
+//                  pos K+4 = C · base² · R²
+//                  ...
+//                For K = 0 we use R = C · base instead of dividing by base^-1.
+function anchoredWeightAtPos(
+  pos: number,
+  base: number,
+  anchorPos: number,
+  anchorValue: number,
+): number {
+  if (pos < anchorPos) return Math.pow(base, pos);
+  if (pos === anchorPos) return anchorValue;
+  const delta = pos - anchorPos;
+  const r =
+    anchorPos >= 1 ? anchorValue / Math.pow(base, anchorPos - 1) : anchorValue * base;
+  const nBase = Math.ceil(delta / 2);
+  const nR = Math.floor(delta / 2);
+  return anchorValue * Math.pow(base, nBase) * Math.pow(r, nR);
+}
+
+function anchoredWeights(
+  len: number,
+  base: number,
+  anchorPos: number,
+  anchorValue: number,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < len; i += 1) {
+    const pos = len - 1 - i;
+    out.push(anchoredWeightAtPos(pos, base, anchorPos, anchorValue));
+  }
+  return out;
+}
+
 function composeStandard(digits: number[], base: number): number {
   let v = 0;
   for (const d of digits) v = v * base + d;
   return v;
 }
 
-function composeCustom(digits: number[], weights: number[]): number {
+function composeWithWeights(digits: number[], weights: number[]): number {
   let s = 0;
   for (let i = 0; i < digits.length; i += 1) {
     s += digits[i] * (weights[i] ?? 0);
@@ -58,51 +112,116 @@ function composeCustom(digits: number[], weights: number[]): number {
   return s;
 }
 
+// Pretty-print the formula behind a derived weight in anchored mode.
+function anchoredFormulaLabel(
+  pos: number,
+  base: number,
+  anchorPos: number,
+): string {
+  if (pos < anchorPos) return `${base}^${pos}`;
+  if (pos === anchorPos) return "C (anchor)";
+  const delta = pos - anchorPos;
+  const nBase = Math.ceil(delta / 2);
+  const nR = Math.floor(delta / 2);
+  // R = C / base^(K-1) so C · base^a · R^b can be re-written more simply.
+  // Express directly: weight = base^nBase · C^(nR + 1) / base^((K-1)·nR)
+  const baseExp = nBase - (anchorPos - 1) * nR;
+  const cExp = nR + 1;
+  let str = "";
+  if (baseExp !== 0) str += `${base}${baseExp === 1 ? "" : `^${baseExp}`}`;
+  if (cExp !== 0) {
+    if (str) str += " · ";
+    str += `C${cExp === 1 ? "" : `^${cExp}`}`;
+  }
+  return str || "1";
+}
+
 export function PlaceValueEditor({
   base,
   symbols,
   bijective = false,
-  customWeights = false,
+  weightMode,
+  anchorPos = 0,
+  anchorValue = 1,
+  onAnchorPosChange,
+  onAnchorValueChange,
   value,
   onChange,
 }: Props) {
-  // Derived "standard" state from the external value (used both in standard
-  // mode and as the seed when the user first switches into custom mode).
+  // Derived "standard" state from the external value.
   const derivedDigits = useMemo(
     () => decompose(value, base, bijective),
     [value, base, bijective],
   );
-  const derivedWeights = useMemo(
-    () => standardWeights(derivedDigits.length, base),
-    [derivedDigits.length, base],
+
+  // "Custom" and "anchored" modes both want LOCAL digit state so that
+  // adjusting the weights / anchor (which changes the resulting decimal)
+  // doesn't make the cells jump around.  We seed the local state from the
+  // standard decomposition the first time we enter such a mode (or on base /
+  // bijective change).
+  const ownsDigits = weightMode === "custom" || weightMode === "anchored";
+  const [localDigits, setLocalDigits] = useState<number[]>(derivedDigits);
+  const [customW, setCustomW] = useState<number[]>(() =>
+    standardWeights(derivedDigits.length, base),
   );
 
-  // Local "custom" state.  Only consulted when customWeights === true.
-  const [customDigits, setCustomDigits] = useState<number[]>(derivedDigits);
-  const [customW, setCustomW] = useState<number[]>(derivedWeights);
-
-  // Snapshot derived state when entering custom mode (and whenever base or
-  // bijective change while inside custom mode).
-  const wasCustom = useRef(false);
+  const prevMode = useRef<WeightMode>(weightMode);
   useEffect(() => {
-    if (customWeights && !wasCustom.current) {
-      setCustomDigits(derivedDigits);
-      setCustomW(derivedWeights);
+    const enteringOwning =
+      (weightMode === "custom" || weightMode === "anchored") &&
+      prevMode.current !== weightMode;
+    if (enteringOwning) {
+      setLocalDigits(derivedDigits);
+      if (weightMode === "custom") {
+        setCustomW(standardWeights(derivedDigits.length, base));
+      }
     }
-    wasCustom.current = customWeights;
-  }, [customWeights, derivedDigits, derivedWeights]);
+    prevMode.current = weightMode;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weightMode]);
 
-  // Also re-seed when base or bijective changes inside custom mode — the digit
-  // range changed, so the existing digits could be out of bounds.
+  // Re-seed when the base or bijective flag changes inside an owning mode.
   useEffect(() => {
-    if (!customWeights) return;
-    setCustomDigits(derivedDigits);
-    setCustomW(derivedWeights);
+    if (!ownsDigits) return;
+    setLocalDigits(derivedDigits);
+    if (weightMode === "custom") {
+      setCustomW(standardWeights(derivedDigits.length, base));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, bijective]);
 
-  const digits = customWeights ? customDigits : derivedDigits;
-  const weights = customWeights ? customW : derivedWeights;
+  const digits = ownsDigits ? localDigits : derivedDigits;
+
+  // Weights — len always tracks `digits.length` so adding a leading column
+  // recomputes the right number of anchored weights.
+  const weightsLen = digits.length;
+  const stdWeights = useMemo(
+    () => standardWeights(weightsLen, base),
+    [weightsLen, base],
+  );
+  const anchWeights = useMemo(
+    () => anchoredWeights(weightsLen, base, anchorPos, anchorValue),
+    [weightsLen, base, anchorPos, anchorValue],
+  );
+  const weights =
+    weightMode === "custom"
+      ? customW
+      : weightMode === "anchored"
+        ? anchWeights
+        : stdWeights;
+
+  // In anchored mode the decimal value follows Σ d_i · w_i; when the user
+  // changes anchorPos or anchorValue the weights shift and the value must
+  // re-publish.  A ref guards against the obvious onChange→value→effect loop.
+  const lastOutRef = useRef<number>(value);
+  useEffect(() => {
+    if (weightMode !== "anchored") return;
+    const v = composeWithWeights(localDigits, anchWeights);
+    if (v !== lastOutRef.current) {
+      lastOutRef.current = v;
+      onChange(v);
+    }
+  }, [weightMode, anchWeights, localDigits, onChange]);
 
   const [focused, setFocused] = useState<number | null>(null);
   const cellRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -110,19 +229,32 @@ export function PlaceValueEditor({
   const minDigit = bijective ? 1 : 0;
   const maxDigit = bijective ? base : base - 1;
 
-  const commitDigits = (nextDigits: number[], nextWeights: number[] = weights) => {
-    if (customWeights) {
-      setCustomDigits(nextDigits);
+  const commitDigits = (
+    nextDigits: number[],
+    nextWeights: number[] = weights,
+  ) => {
+    if (weightMode === "custom") {
+      setLocalDigits(nextDigits);
       setCustomW(nextWeights);
-      onChange(composeCustom(nextDigits, nextWeights));
+      const v = composeWithWeights(nextDigits, nextWeights);
+      lastOutRef.current = v;
+      onChange(v);
+    } else if (weightMode === "anchored") {
+      setLocalDigits(nextDigits);
+      const w = anchoredWeights(nextDigits.length, base, anchorPos, anchorValue);
+      const v = composeWithWeights(nextDigits, w);
+      lastOutRef.current = v;
+      onChange(v);
     } else {
       onChange(composeStandard(nextDigits, base));
     }
   };
 
-  const commitWeights = (nextWeights: number[]) => {
+  const commitCustomWeights = (nextWeights: number[]) => {
     setCustomW(nextWeights);
-    onChange(composeCustom(digits, nextWeights));
+    const v = composeWithWeights(digits, nextWeights);
+    lastOutRef.current = v;
+    onChange(v);
   };
 
   const adjust = (i: number, delta: number) => {
@@ -144,14 +276,18 @@ export function PlaceValueEditor({
   const setWeightAt = (i: number, w: number) => {
     const next = [...weights];
     next[i] = w;
-    commitWeights(next);
+    commitCustomWeights(next);
   };
 
   const addLeading = () => {
     const newDigits = [minDigit === 0 ? 1 : minDigit, ...digits];
-    const leadingWeight = weights[0] ?? 1;
-    const newWeights = [leadingWeight * base, ...weights];
-    commitDigits(newDigits, newWeights);
+    if (weightMode === "custom") {
+      const leadingWeight = weights[0] ?? 1;
+      const newWeights = [leadingWeight * base, ...weights];
+      commitDigits(newDigits, newWeights);
+    } else {
+      commitDigits(newDigits);
+    }
   };
 
   const removeLeading = () => {
@@ -159,11 +295,15 @@ export function PlaceValueEditor({
       commitDigits(bijective ? [] : [0], bijective ? [] : [1]);
       return;
     }
-    commitDigits(digits.slice(1), weights.slice(1));
+    if (weightMode === "custom") {
+      commitDigits(digits.slice(1), weights.slice(1));
+    } else {
+      commitDigits(digits.slice(1));
+    }
   };
 
   const snapWeightsToPowers = () => {
-    commitWeights(standardWeights(digits.length, base));
+    commitCustomWeights(standardWeights(digits.length, base));
   };
 
   const renderDigits = digits.length === 0 ? [] : digits;
@@ -195,8 +335,8 @@ export function PlaceValueEditor({
       }
     };
 
-  // Total cell height we lock to so the "+" key and any empty-state matches.
-  const COLUMN_HEIGHT = customWeights ? 224 : 184;
+  const COLUMN_HEIGHT =
+    weightMode === "powers" ? 184 : 236;
 
   return (
     <div className="space-y-4">
@@ -215,14 +355,19 @@ export function PlaceValueEditor({
           const symbol = bijective ? symbols[d - 1] ?? "?" : symbols[d] ?? "?";
           const isLeading = i === 0;
           const isFocused = focused === i;
+          const isAnchor = weightMode === "anchored" && power === anchorPos;
+          const formula =
+            weightMode === "anchored"
+              ? anchoredFormulaLabel(power, base, anchorPos)
+              : "";
 
           return (
             <div
               key={i}
-              className="flex w-[76px] shrink-0 flex-col items-stretch gap-1.5"
+              className="flex w-[78px] shrink-0 flex-col items-stretch gap-1.5"
             >
-              {/* Top: weight (custom mode) or power label (standard mode) */}
-              {customWeights ? (
+              {/* Top: weight (custom/anchor) or power label */}
+              {weightMode === "custom" ? (
                 <label className="flex flex-col items-center gap-0.5">
                   <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-neon-violet/80">
                     × weight
@@ -237,9 +382,57 @@ export function PlaceValueEditor({
                     className="h-8 w-full rounded-md border border-neon-violet/30 bg-ink-900/70 px-1 text-center font-mono text-[13px] text-neon-violet outline-none focus:border-neon-violet/70 focus:bg-neon-violet/10"
                   />
                 </label>
+              ) : weightMode === "anchored" ? (
+                <div className="flex flex-col items-center gap-0.5">
+                  <button
+                    onClick={() => onAnchorPosChange?.(power)}
+                    title={
+                      isAnchor
+                        ? "Anchor column"
+                        : "Click to make this column the anchor"
+                    }
+                    className={`font-mono text-[9px] uppercase tracking-[0.18em] transition ${
+                      isAnchor
+                        ? "text-neon-gold"
+                        : "text-white/35 hover:text-white/70"
+                    }`}
+                  >
+                    {isAnchor ? "★ anchor" : "set anchor"}
+                  </button>
+                  {isAnchor ? (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={anchorValue}
+                      onChange={(e) =>
+                        onAnchorValueChange?.(Number(e.target.value) || 0)
+                      }
+                      className="h-8 w-full rounded-md border border-neon-gold/50 bg-neon-gold/5 px-1 text-center font-mono text-[13px] text-neon-gold outline-none focus:border-neon-gold/80 focus:bg-neon-gold/10"
+                    />
+                  ) : (
+                    <span
+                      className="grid h-8 w-full place-items-center rounded-md border border-white/10 bg-ink-900/50 px-1 text-center font-mono text-[13px] text-white/70"
+                      title={`= ${formula}`}
+                    >
+                      {Number.isFinite(w)
+                        ? Number(w.toFixed(4)).toString()
+                        : "—"}
+                    </span>
+                  )}
+                </div>
               ) : (
                 <span className="block h-8 pt-2 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
                   {base}<sup>{power}</sup>
+                </span>
+              )}
+
+              {/* Formula caption — only in anchored mode */}
+              {weightMode === "anchored" && (
+                <span
+                  className="block h-3 text-center font-mono text-[9px] leading-3 text-white/40"
+                  title={formula}
+                >
+                  {formula}
                 </span>
               )}
 
@@ -270,9 +463,11 @@ export function PlaceValueEditor({
                   onKeyDown={onCellKey(i)}
                   layout
                   className={`grid h-[88px] w-full place-items-center rounded-xl border font-mono text-3xl tracking-wider transition ${
-                    isFocused
-                      ? "border-neon-cyan/70 bg-neon-cyan/10 text-white shadow-glow"
-                      : "border-white/10 bg-ink-900/60 text-white/95 hover:border-white/25"
+                    isAnchor
+                      ? "border-neon-gold/50 bg-neon-gold/5 text-white shadow-[0_0_24px_-8px_rgba(245,199,106,0.5)]"
+                      : isFocused
+                        ? "border-neon-cyan/70 bg-neon-cyan/10 text-white shadow-glow"
+                        : "border-white/10 bg-ink-900/60 text-white/95 hover:border-white/25"
                   }`}
                 >
                   <motion.span
@@ -308,9 +503,9 @@ export function PlaceValueEditor({
               {/* Contribution */}
               <span
                 className="block truncate text-center font-mono text-[10px] text-white/55"
-                title={`${d} × ${w} = ${d * w}`}
+                title={`${d} × ${w}`}
               >
-                = {(d * w).toLocaleString("en")}
+                = {Number.isFinite(w) ? (d * w).toLocaleString("en") : "—"}
               </span>
             </div>
           );
@@ -329,13 +524,24 @@ export function PlaceValueEditor({
         <span className="font-mono uppercase tracking-[0.2em] text-white/40">
           ↑/↓ adjust · ←/→ move · type a digit · right-click decrement
         </span>
-        {customWeights && (
+        {weightMode === "custom" && (
           <button
             onClick={snapWeightsToPowers}
             className="rounded-full border border-white/10 px-3 py-1 text-white/70 hover:border-neon-cyan/60 hover:text-neon-cyan"
             title={`Reset weights to ${base}^p`}
           >
             ↺ snap weights to {base}<sup>p</sup>
+          </button>
+        )}
+        {weightMode === "anchored" && (
+          <button
+            onClick={() => {
+              onAnchorValueChange?.(Math.pow(base, anchorPos));
+            }}
+            className="rounded-full border border-white/10 px-3 py-1 text-white/70 hover:border-neon-gold/60 hover:text-neon-gold"
+            title={`Reset the anchor's value to ${base}^${anchorPos}`}
+          >
+            ↺ reset anchor to {base}<sup>{anchorPos}</sup>
           </button>
         )}
       </div>
