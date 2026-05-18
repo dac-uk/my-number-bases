@@ -9,6 +9,7 @@ const LINKS: { href: string; label: string }[] = [
   { href: "/infinity", label: "Infinity" },
   { href: "/patterns", label: "Patterns" },
   { href: "/sandbox", label: "Sandbox" },
+  { href: "/lab", label: "Lab" },
   { href: "/learn", label: "Learn" },
 ];
 

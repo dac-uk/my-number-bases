@@ -64,6 +64,14 @@ const LESSONS: Lesson[] = [
     href: "/explore",
   },
   {
+    slug: "lab",
+    tag: "★ · lab",
+    title: "The toy lab",
+    body:
+      "Seven self-contained interactive playgrounds: Conway's Life, RSA, modular arithmetic, the Stern–Brocot tree, hyperbolic geometry, self-referential sentences, and procedural L-systems.",
+    href: "/lab",
+  },
+  {
     slug: "infinity",
     tag: "08 · infinity",
     title: "Not all infinities are equal",
