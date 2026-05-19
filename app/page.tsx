@@ -41,12 +41,12 @@ export default function HomePage() {
       </section>
 
       <section className="mt-20 sm:mt-28">
-        <h2 className="font-display text-2xl tracking-tight sm:text-3xl">Five ways in</h2>
+        <h2 className="font-display text-2xl tracking-tight sm:text-3xl">Seven ways in</h2>
         <p className="mt-2 max-w-xl text-white/60">
           Each room is a different lens onto the same question — what is a
           number, really?
         </p>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <FeatureCard
             href="/explore"
             tag="Converter"
@@ -81,6 +81,20 @@ export default function HomePage() {
             title="What happens if…"
             body="Invent your own bases, edit each digit by hand. Break things on purpose."
             tint="cyan"
+          />
+          <FeatureCard
+            href="/lab"
+            tag="Lab"
+            title="Mathematical toys"
+            body="Conway's Life, RSA, hyperbolic triangles, Gödel sentences, L-systems and more — seven self-contained interactives."
+            tint="mint"
+          />
+          <FeatureCard
+            href="/learn"
+            tag="Learn"
+            title="Short ideas"
+            body="A card deck of bite-sized concepts, each pointing back to the relevant interactive. Start here if you want a path."
+            tint="violet"
           />
         </div>
       </section>
@@ -123,13 +137,14 @@ function FeatureCard({
   tag: string;
   title: string;
   body: string;
-  tint: "cyan" | "violet" | "magenta" | "gold";
+  tint: "cyan" | "violet" | "magenta" | "gold" | "mint";
 }) {
   const ring: Record<string, string> = {
     cyan: "hover:border-neon-cyan/50 hover:shadow-glow",
     violet: "hover:border-neon-violet/50 hover:shadow-glowViolet",
     magenta: "hover:border-neon-magenta/50",
     gold: "hover:border-neon-gold/50",
+    mint: "hover:border-neon-mint/50",
   };
   return (
     <Link
