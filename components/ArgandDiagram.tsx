@@ -13,6 +13,8 @@ interface Props {
   /** Tailwind className for the outer container (e.g. min-height utilities). */
   className?: string;
   showTrail?: boolean;
+  /** Scale the circle and the i^k vector by this radius. */
+  radius?: number;
 }
 
 // Renders the Argand plane with the i^k vector and trail.
@@ -22,6 +24,7 @@ export function ArgandDiagram({
   aspect = 1,
   className = "",
   showTrail = true,
+  radius = 1,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const trailRef = useRef<{ x: number; y: number }[]>([]);
@@ -98,6 +101,16 @@ export function ArgandDiagram({
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // scaled circle (radius r)
+      if (radius !== 1 && radius > 0) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, unit * radius, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255,95,162,0.35)";
+        ctx.setLineDash([2, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
       // cardinal markers 1, i, -1, -i
       const cardinals: { c: Complex; label: string }[] = [
         { c: { re: 1, im: 0 }, label: "1" },
@@ -135,10 +148,10 @@ export function ArgandDiagram({
         }
       }
 
-      // i^k vector
+      // i^k vector (scaled by radius)
       const z = iPower(k);
-      const px = cx + z.re * unit;
-      const py = cy - z.im * unit;
+      const px = cx + z.re * unit * radius;
+      const py = cy - z.im * unit * radius;
 
       // trail
       if (showTrail) {
@@ -182,7 +195,7 @@ export function ArgandDiagram({
     return () => {
       window.removeEventListener("resize", onResize);
     };
-  }, [k, points, showTrail]);
+  }, [k, points, showTrail, radius]);
 
   return (
     <div

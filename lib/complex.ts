@@ -38,9 +38,14 @@ export function cArg(a: Complex): number {
 export function cFormat(a: Complex, digits = 3): string {
   const r = round(a.re, digits);
   const i = round(a.im, digits);
+  const imPart = (v: number) => {
+    if (v === 1) return "i";
+    if (v === -1) return "-i";
+    return `${v}i`;
+  };
   if (i === 0) return `${r}`;
-  if (r === 0) return `${i}i`;
-  return `${r}${i > 0 ? "+" : ""}${i}i`;
+  if (r === 0) return imPart(i);
+  return `${r}${i > 0 ? "+" : ""}${imPart(i)}`;
 }
 
 function round(x: number, digits: number): number {

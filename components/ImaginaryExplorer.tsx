@@ -6,12 +6,15 @@ import { ArgandDiagram } from "@/components/ArgandDiagram";
 import {
   iPower,
   cFormat,
+  cScale,
   toBaseMinusOnePlusI,
   type Complex,
 } from "@/lib/complex";
 
 export function ImaginaryExplorer() {
   const [k, setK] = useState(0);
+  const [radius, setRadius] = useState(1);
+  const [radiusInput, setRadiusInput] = useState("1");
   const [playing, setPlaying] = useState(true);
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number>(0);
@@ -38,14 +41,14 @@ export function ImaginaryExplorer() {
     };
   }, [playing]);
 
-  const z = iPower(k);
+  const z = cScale(iPower(k), radius);
   const integerK = Math.round(k) % 4;
   const cycle = ["1", "i", "−1", "−i"];
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-4">
-        <ArgandDiagram k={k} aspect={1} />
+        <ArgandDiagram k={k} aspect={1} radius={radius} />
         <div className="glass rounded-2xl p-5">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
             Powers of i form a cycle of length 4
@@ -108,6 +111,24 @@ export function ImaginaryExplorer() {
               </p>
             </div>
           </div>
+
+          <label className="mt-4 block">
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-white/40">
+              radius
+            </span>
+            <input
+              type="number"
+              step="0.1"
+              value={radiusInput}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setRadiusInput(raw);
+                const parsed = Number(raw);
+                if (Number.isFinite(parsed)) setRadius(parsed);
+              }}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-ink-900/60 px-3 py-2 font-mono text-lg"
+            />
+          </label>
 
           <button
             onClick={() => setPlaying((p) => !p)}
